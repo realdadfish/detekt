@@ -6,6 +6,7 @@ include(
     "detekt-core",
     "detekt-formatting",
     "detekt-generator",
+    "detekt-gradle-android-plugin",
     "detekt-gradle-plugin",
     "detekt-metrics",
     "detekt-parser",

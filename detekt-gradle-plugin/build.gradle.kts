@@ -10,7 +10,6 @@ repositories {
 dependencies {
     implementation(kotlin("gradle-plugin"))
     implementation(kotlin("gradle-plugin-api"))
-    compileOnly("com.android.tools.build:gradle:4.0.0")
 
     testImplementation(project(":detekt-test-utils"))
 }
