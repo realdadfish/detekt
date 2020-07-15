@@ -3,7 +3,7 @@ package io.gitlab.arturbosch.detekt
 import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
-import com.android.build.gradle.TestedExtension
+import com.android.build.gradle.TestExtension
 import com.android.build.gradle.api.BaseVariant
 import com.android.build.gradle.internal.api.TestedVariant
 import com.android.build.gradle.internal.tasks.factory.dependsOn
@@ -60,7 +60,7 @@ class DetektAndroidPlugin : Plugin<Project> {
         get() = when (this) {
             is AppExtension -> applicationVariants
             is LibraryExtension -> libraryVariants
-            is TestedExtension -> testVariants
+            is TestExtension -> applicationVariants
             else -> null
         }
 

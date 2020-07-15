@@ -8,12 +8,14 @@ repositories {
 }
 
 dependencies {
+    val androidGradlePlugin = "com.android.tools.build:gradle:4.0.0"
     implementation(kotlin("gradle-plugin"))
     implementation(kotlin("gradle-plugin-api"))
     api(project(":detekt-gradle-plugin"))
-    compileOnly("com.android.tools.build:gradle:4.0.0")
+    compileOnly(androidGradlePlugin)
 
     testImplementation(project(":detekt-test-utils"))
+    testImplementation(androidGradlePlugin)
 }
 
 gradlePlugin {
