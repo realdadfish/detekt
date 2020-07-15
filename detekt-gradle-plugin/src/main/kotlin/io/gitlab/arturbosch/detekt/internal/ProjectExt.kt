@@ -18,7 +18,10 @@ fun Project.registerDetektTask(
         it.failFastProp.set(provider { extension.failFast })
         it.autoCorrectProp.set(provider { extension.autoCorrect })
         it.config.setFrom(provider { extension.config })
-        it.baseline.set(layout.file(project.provider { extension.baseline }))
+        // If a baseline file is configured as input file, it must exist to be configured, otherwise the task fails.
+        if (extension.baseline?.exists() == true) {
+            it.baseline.set(layout.file(project.provider { extension.baseline }))
+        }
         it.ignoreFailuresProp.set(project.provider { extension.ignoreFailures })
         configuration(it)
     }
