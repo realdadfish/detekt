@@ -83,7 +83,7 @@ class DetektPlugin : Plugin<Project> {
             ?: throw GradleException("Kotlin source set not found. Please report on detekt's issue tracker")
         registerDetektTask(DETEKT_TASK_NAME + sourceSet.name.capitalize(), extension) {
             setSource(kotlinSourceSet.kotlin.files)
-            classpath.setFrom(sourceSet.compileClasspath, sourceSet.output.classesDirs)
+            classpath.setFrom(sourceSet.compileClasspath, sourceSet.output.classesDirs.filter { it.exists() })
             reports.xml.destination = File(extension.reportsDir, sourceSet.name + ".xml")
             reports.html.destination = File(extension.reportsDir, sourceSet.name + ".html")
             reports.txt.destination = File(extension.reportsDir, sourceSet.name + ".txt")

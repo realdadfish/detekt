@@ -100,7 +100,7 @@ class DetektAndroidPlugin : Plugin<Project> {
     ): TaskProvider<Detekt> =
         registerDetektTask(DetektPlugin.DETEKT_TASK_NAME + variant.name.capitalize(), extension) {
             setSource(variant.sourceSets.map { it.javaDirectories })
-            classpath.setFrom(variant.getCompileClasspath(null) + bootClasspath)
+            classpath.setFrom(variant.getCompileClasspath(null).filter { it.exists() } + bootClasspath)
             reports.xml.destination = File(extension.reportsDir, variant.name + ".xml")
             reports.html.destination = File(extension.reportsDir, variant.name + ".html")
             reports.txt.destination = File(extension.reportsDir, variant.name + ".txt")
