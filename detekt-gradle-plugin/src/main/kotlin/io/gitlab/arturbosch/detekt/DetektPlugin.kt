@@ -1,6 +1,9 @@
 package io.gitlab.arturbosch.detekt
 
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
+import io.gitlab.arturbosch.detekt.internal.addVariantName
+import io.gitlab.arturbosch.detekt.internal.existingVariantOrBaseFile
+import io.gitlab.arturbosch.detekt.internal.registerCreateBaselineTask
 import io.gitlab.arturbosch.detekt.internal.registerDetektTask
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
@@ -35,7 +38,7 @@ class DetektPlugin : Plugin<Project> {
 
         project.registerOldDetektTask(extension)
         project.registerDetektTasks(extension)
-        project.registerCreateBaselineTask(extension)
+        project.registerOldCreateBaselineTask(extension)
         project.registerGenerateConfigTask()
     }
 
@@ -51,6 +54,7 @@ class DetektPlugin : Plugin<Project> {
             project.afterEvaluate {
                 project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.all { sourceSet ->
                     project.registerJvmDetektTask(extension, sourceSet)
+                    project.registerJvmCreateBaselineTask(extension, sourceSet)
                 }
             }
         }
@@ -85,26 +89,34 @@ class DetektPlugin : Plugin<Project> {
         registerDetektTask(DETEKT_TASK_NAME + sourceSet.name.capitalize(), extension) {
             setSource(kotlinSourceSet.kotlin.files)
             classpath.setFrom(sourceSet.compileClasspath, sourceSet.output.classesDirs.filter { it.exists() })
+            // If a baseline file is configured as input file, it must exist to be configured, otherwise the task fails.
+            // We try to find the configured baseline or alternatively a specific variant matching this task.
+            extension.baseline?.existingVariantOrBaseFile(sourceSet.name)?.let { baselineFile ->
+                baseline.set(layout.file(project.provider { baselineFile }))
+            }
             reports.xml.destination = File(extension.reportsDir, sourceSet.name + ".xml")
             reports.html.destination = File(extension.reportsDir, sourceSet.name + ".html")
             reports.txt.destination = File(extension.reportsDir, sourceSet.name + ".txt")
-            description = "EXPERIMENTAL & SLOW: Run detekt analysis for ${sourceSet.name} classes with type resolution"
+            description = "EXPERIMENTAL: Run detekt analysis for ${sourceSet.name} classes with type resolution"
         }
     }
 
-    private fun Project.registerCreateBaselineTask(extension: DetektExtension) =
-        tasks.register(BASELINE, DetektCreateBaselineTask::class.java) {
-            it.baseline.set(project.layout.file(project.provider { extension.baseline }))
-            it.config.setFrom(project.provider { extension.config })
-            it.debug.set(project.provider { extension.debug })
-            it.parallel.set(project.provider { extension.parallel })
-            it.disableDefaultRuleSets.set(project.provider { extension.disableDefaultRuleSets })
-            it.buildUponDefaultConfig.set(project.provider { extension.buildUponDefaultConfig })
-            it.failFast.set(project.provider { extension.failFast })
-            it.autoCorrect.set(project.provider { extension.autoCorrect })
-            it.setSource(existingInputDirectoriesProvider(project, extension))
-            it.setIncludes(defaultIncludes)
-            it.setExcludes(defaultExcludes)
+    private fun Project.registerJvmCreateBaselineTask(extension: DetektExtension, sourceSet: SourceSet) {
+        val kotlinSourceSet = (sourceSet as HasConvention).convention.plugins["kotlin"] as? KotlinSourceSet
+            ?: throw GradleException("Kotlin source set not found. Please report on detekt's issue tracker")
+        registerCreateBaselineTask(BASELINE + sourceSet.name.capitalize(), extension) {
+            setSource(kotlinSourceSet.kotlin.files)
+            classpath.setFrom(sourceSet.compileClasspath, sourceSet.output.classesDirs.filter { it.exists() })
+            val variantBaselineFile = extension.baseline?.addVariantName(sourceSet.name)
+            baseline.set(project.layout.file(project.provider { variantBaselineFile }))
+            description = "EXPERIMENTAL: Creates detekt baseline for ${sourceSet.name} classes with type resolution"
+        }
+    }
+
+    private fun Project.registerOldCreateBaselineTask(extension: DetektExtension) =
+        registerCreateBaselineTask(BASELINE, extension) {
+            setSource(existingInputDirectoriesProvider(project, extension))
+            baseline.set(project.layout.file(project.provider { extension.baseline }))
         }
 
     private fun Project.registerGenerateConfigTask() =
@@ -157,8 +169,8 @@ class DetektPlugin : Plugin<Project> {
         const val DETEKT_ANDROID_EXTENSION = "detektAndroid"
         private const val GENERATE_CONFIG = "detektGenerateConfig"
         private const val BASELINE = "detektBaseline"
-        private val defaultExcludes = listOf("build/")
-        private val defaultIncludes = listOf("**/*.kt", "**/*.kts")
+        internal val defaultExcludes = listOf("build/")
+        internal val defaultIncludes = listOf("**/*.kt", "**/*.kts")
         internal const val CONFIG_DIR_NAME = "config/detekt"
         internal const val CONFIG_FILE = "detekt.yml"
     }
