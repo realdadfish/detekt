@@ -16,7 +16,7 @@ import org.spekframework.spek2.Spek
 import org.spekframework.spek2.style.specification.describe
 
 object DetektAndroidPluginTest : Spek({
-    describe("detekt Android plugin") {
+    describe("detekt android plugin") {
         it("applies the base gradle plugin and creates a regular detekt task") {
             val project = ProjectBuilder.builder().build()
 
@@ -26,6 +26,21 @@ object DetektAndroidPluginTest : Spek({
             }
 
             Assertions.assertThat(project.getTask("check").dependencies()).contains("detekt")
+        }
+
+        it("lets the base gradle plugin use it's configuration") {
+            val project = ProjectBuilder.builder().build()
+
+            with(project.pluginManager) {
+                apply(DetektAndroidPlugin::class.java)
+                apply(LifecycleBasePlugin::class.java)
+            }
+
+            project.configureExtension<DetektAndroidExtension> {
+                parallel = true
+            }
+
+            Assertions.assertThat((project.getTask("detekt") as Detekt).parallel).isTrue()
         }
 
         it("creates experimental tasks if the Android library plugin is present") {

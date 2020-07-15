@@ -20,7 +20,7 @@ class DetektPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         project.pluginManager.apply(ReportingBasePlugin::class.java)
-        val extension = project.extensions.create(DETEKT_TASK_NAME, DetektExtension::class.java, project)
+        val extension = project.getOrCreateExtension()
         extension.reportsDir = project.extensions.getByType(ReportingExtension::class.java).file("detekt")
 
         val defaultConfigFile =
@@ -37,6 +37,12 @@ class DetektPlugin : Plugin<Project> {
         project.registerCreateBaselineTask(extension)
         project.registerGenerateConfigTask()
     }
+
+    // The Android Detekt plugin extends this plugins extension, so if this was applied
+    // and configured instead, read out it's configuration
+    private fun Project.getOrCreateExtension(): DetektExtension =
+        extensions.findByName(DETEKT_ANDROID_EXTENSION) as? DetektExtension?
+            ?: extensions.create(DETEKT_EXTENSION, DetektExtension::class.java, project)
 
     private fun Project.registerDetektTasks(extension: DetektExtension) {
         // Kotlin JVM plugin
@@ -146,6 +152,8 @@ class DetektPlugin : Plugin<Project> {
 
     companion object {
         const val DETEKT_TASK_NAME = "detekt"
+        const val DETEKT_EXTENSION = "detekt"
+        const val DETEKT_ANDROID_EXTENSION = "detektAndroid"
         private const val GENERATE_CONFIG = "detektGenerateConfig"
         private const val BASELINE = "detektBaseline"
         private val defaultExcludes = listOf("build/")

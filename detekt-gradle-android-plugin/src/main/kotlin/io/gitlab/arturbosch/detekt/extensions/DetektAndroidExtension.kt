@@ -1,8 +1,8 @@
 package io.gitlab.arturbosch.detekt.extensions
 
-import org.gradle.api.plugins.quality.CodeQualityExtension
+import org.gradle.api.Project
 
-open class DetektAndroidExtension : CodeQualityExtension() {
+open class DetektAndroidExtension(project: Project) : DetektExtension(project) {
 
     /**
      * List build variants for which no detekt task should be created.

@@ -38,16 +38,17 @@ class DetektAndroidPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         this.project = project
+        // The android extension inherits from the regular Detekt extension, so users don't have to configure two
+        val androidExtension = project.extensions.create(
+            DetektPlugin.DETEKT_ANDROID_EXTENSION,
+            DetektAndroidExtension::class.java,
+            project
+        )
         project.pluginManager.apply(DetektPlugin::class.java)
-        val extension = project.extensions.getByType(DetektExtension::class.java)
-        val androidExtension = project.extensions.create(DETEKT_ANDROID_EXTENSION, DetektAndroidExtension::class.java)
-        project.registerDetektTasks(extension, androidExtension)
+        project.registerDetektTasks(androidExtension)
     }
 
-    private fun Project.registerDetektTasks(
-        extension: DetektExtension,
-        androidExtension: DetektAndroidExtension
-    ) {
+    private fun Project.registerDetektTasks(extension: DetektAndroidExtension) {
         project.plugins.withId("kotlin-android") {
             // There is not a single Android plugin, but each registers an extension based on BaseExtension,
             // so we catch them all by looking for this one
@@ -56,13 +57,13 @@ class DetektAndroidPlugin : Plugin<Project> {
                 baseExtension?.let {
                     val bootClasspath = files(baseExtension.bootClasspath)
                     baseExtension.variants
-                        ?.matching { !androidExtension.matchesIgnoredConfiguration(it) }
+                        ?.matching { !extension.matchesIgnoredConfiguration(it) }
                         ?.all { variant ->
                             project.registerAndroidDetektTask(bootClasspath, extension, variant).also { provider ->
                                 mainTaskProvider.dependsOn(provider)
                             }
                             variant.testVariants
-                                .filter { !androidExtension.matchesIgnoredConfiguration(it) }
+                                .filter { !extension.matchesIgnoredConfiguration(it) }
                                 .forEach { testVariant ->
                                     project.registerAndroidDetektTask(bootClasspath, extension, testVariant)
                                         .also { provider ->
@@ -105,8 +106,4 @@ class DetektAndroidPlugin : Plugin<Project> {
             reports.txt.destination = File(extension.reportsDir, variant.name + ".txt")
             description = "EXPERIMENTAL & SLOW: Run detekt analysis for ${variant.name} classes with type resolution"
         }
-
-    companion object {
-        const val DETEKT_ANDROID_EXTENSION = "detektAndroid"
-    }
 }
