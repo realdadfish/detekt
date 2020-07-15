@@ -12,13 +12,32 @@ import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.TaskProvider
 import java.io.File
 
 class DetektAndroidPlugin : Plugin<Project> {
 
+    private lateinit var project: Project
+    private val mainTaskProvider: TaskProvider<Task> by lazy {
+        project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Main") {
+            it.group = "verification"
+            it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for production classes across " +
+                    "all variants with type resolution"
+        }
+    }
+
+    private val testTaskProvider: TaskProvider<Task> by lazy {
+        project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Test") {
+            it.group = "verification"
+            it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for test classes across " +
+                    "all variants with type resolution"
+        }
+    }
+
     override fun apply(project: Project) {
+        this.project = project
         project.pluginManager.apply(DetektPlugin::class.java)
         val extension = project.extensions.getByType(DetektExtension::class.java)
         val androidExtension = project.extensions.create(DETEKT_ANDROID_EXTENSION, DetektAndroidExtension::class.java)
@@ -35,16 +54,6 @@ class DetektAndroidPlugin : Plugin<Project> {
             project.afterEvaluate {
                 val baseExtension = project.extensions.findByType(BaseExtension::class.java)
                 baseExtension?.let {
-                    val mainTaskProvider = project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Main") {
-                        it.group = "verification"
-                        it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for production classes across " +
-                                "all variants with type resolution"
-                    }
-                    val testTaskProvider = project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Test") {
-                        it.group = "verification"
-                        it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for test classes across " +
-                                "all variants with type resolution"
-                    }
                     val bootClasspath = files(baseExtension.bootClasspath)
                     baseExtension.variants
                         ?.matching { !androidExtension.matchesIgnoredConfiguration(it) }
@@ -65,7 +74,6 @@ class DetektAndroidPlugin : Plugin<Project> {
             }
         }
     }
-
 
     private fun DetektAndroidExtension.matchesIgnoredConfiguration(variant: BaseVariant): Boolean =
         ignoredVariants.contains(variant.name) ||
