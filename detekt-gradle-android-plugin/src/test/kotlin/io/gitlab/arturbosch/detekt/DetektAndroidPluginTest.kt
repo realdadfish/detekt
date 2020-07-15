@@ -4,6 +4,7 @@ import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
 import com.android.build.gradle.TestExtension
+import io.gitlab.arturbosch.detekt.extensions.DetektAndroidExtension
 import org.assertj.core.api.Assertions
 import org.gradle.api.Action
 import org.gradle.api.Project
@@ -36,15 +37,17 @@ object DetektAndroidPluginTest : Spek({
                 apply("kotlin-android")
             }
 
-            project.configureAndroidPlugin<LibraryExtension>()
+            project.configureExtension<LibraryExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+            }
 
             project.evaluate()
 
             Assertions.assertThat(project.getTask("detektMain").dependencies())
-                .contains("detektDebug", "detektRelease")
+                .containsExactlyInAnyOrder("detektDebug", "detektRelease")
 
             Assertions.assertThat(project.getTask("detektTest").dependencies())
-                .contains(
+                .containsExactlyInAnyOrder(
                     "detektDebugUnitTest",
                     "detektReleaseUnitTest",
                     "detektDebugAndroidTest"
@@ -60,15 +63,17 @@ object DetektAndroidPluginTest : Spek({
                 apply("kotlin-android")
             }
 
-            project.configureAndroidPlugin<AppExtension>()
+            project.configureExtension<AppExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+            }
 
             project.evaluate()
 
             Assertions.assertThat(project.getTask("detektMain").dependencies())
-                .contains("detektDebug", "detektRelease")
+                .containsExactlyInAnyOrder("detektDebug", "detektRelease")
 
             Assertions.assertThat(project.getTask("detektTest").dependencies())
-                .contains(
+                .containsExactlyInAnyOrder(
                     "detektDebugUnitTest",
                     "detektReleaseUnitTest",
                     "detektDebugAndroidTest"
@@ -85,7 +90,8 @@ object DetektAndroidPluginTest : Spek({
                 apply("kotlin-android")
             }
 
-            testProject.configureAndroidPlugin<TestExtension> {
+            testProject.configureExtension<TestExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
                 targetProjectPath("prod")
             }
 
@@ -93,7 +99,7 @@ object DetektAndroidPluginTest : Spek({
 
             // Test extensions by default have only the debug variant configured
             Assertions.assertThat(testProject.getTask("detektMain").dependencies())
-                .contains("detektDebug")
+                .containsExactlyInAnyOrder("detektDebug")
 
             // There is no test code for test code, the main task is still created for consistency
             Assertions.assertThat(testProject.getTask("detektTest").dependencies())
@@ -109,28 +115,15 @@ object DetektAndroidPluginTest : Spek({
                 apply("kotlin-android")
             }
 
-            project.configureAndroidPlugin<LibraryExtension> {
-                flavorDimensions("age", "name")
-                productFlavors(Action {
-                    it.create("harry").apply {
-                        dimension = "name"
-                    }
-                    it.create("sally").apply {
-                        dimension = "name"
-                    }
-                    it.create("young").apply {
-                        dimension = "age"
-                    }
-                    it.create("old").apply {
-                        dimension = "age"
-                    }
-                })
+            project.configureExtension<LibraryExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+                flavorTestSetup()
             }
 
             project.evaluate()
 
             Assertions.assertThat(project.getTask("detektMain").dependencies())
-                .contains(
+                .containsExactlyInAnyOrder(
                     "detektYoungHarryDebug",
                     "detektYoungHarryRelease",
                     "detektOldHarryDebug",
@@ -142,7 +135,7 @@ object DetektAndroidPluginTest : Spek({
                 )
 
             Assertions.assertThat(project.getTask("detektTest").dependencies())
-                .contains(
+                .containsExactlyInAnyOrder(
                     // unit tests
                     "detektYoungHarryDebugUnitTest",
                     "detektYoungHarryReleaseUnitTest",
@@ -159,8 +152,140 @@ object DetektAndroidPluginTest : Spek({
                     "detektOldSallyDebugAndroidTest"
                 )
         }
+
+        it("creates experimental tasks for different build variants excluding ignored variants") {
+            val project = ProjectBuilder.builder().build()
+
+            with(project.pluginManager) {
+                apply(DetektAndroidPlugin::class.java)
+                apply("com.android.library")
+                apply("kotlin-android")
+            }
+
+            project.configureExtension<LibraryExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+                flavorTestSetup()
+            }
+
+            project.configureExtension<DetektAndroidExtension> {
+                ignoredVariants = listOf("youngHarryDebug", "oldSallyRelease")
+            }
+
+            project.evaluate()
+
+            Assertions.assertThat(project.getTask("detektMain").dependencies())
+                .containsExactlyInAnyOrder(
+                    "detektYoungHarryRelease",
+                    "detektOldHarryDebug",
+                    "detektOldHarryRelease",
+                    "detektYoungSallyDebug",
+                    "detektYoungSallyRelease",
+                    "detektOldSallyDebug"
+                )
+
+            Assertions.assertThat(project.getTask("detektTest").dependencies())
+                .containsExactlyInAnyOrder(
+                    // unit tests
+                    "detektYoungHarryReleaseUnitTest",
+                    "detektOldHarryDebugUnitTest",
+                    "detektOldHarryReleaseUnitTest",
+                    "detektYoungSallyDebugUnitTest",
+                    "detektYoungSallyReleaseUnitTest",
+                    "detektOldSallyDebugUnitTest",
+                    // instrumentation tests
+                    "detektOldHarryDebugAndroidTest",
+                    "detektYoungSallyDebugAndroidTest",
+                    "detektOldSallyDebugAndroidTest"
+                )
+        }
+
+        it("creates experimental tasks for different build variants excluding ignored build types") {
+            val project = ProjectBuilder.builder().build()
+
+            with(project.pluginManager) {
+                apply(DetektAndroidPlugin::class.java)
+                apply("com.android.library")
+                apply("kotlin-android")
+            }
+
+            project.configureExtension<LibraryExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+                flavorTestSetup()
+            }
+
+            project.configureExtension<DetektAndroidExtension> {
+                ignoredBuildTypes = listOf("release")
+            }
+
+            project.evaluate()
+
+            Assertions.assertThat(project.getTask("detektMain").dependencies())
+                .containsExactlyInAnyOrder(
+                    "detektYoungHarryDebug",
+                    "detektOldHarryDebug",
+                    "detektYoungSallyDebug",
+                    "detektOldSallyDebug"
+                )
+
+            Assertions.assertThat(project.getTask("detektTest").dependencies())
+                .containsExactlyInAnyOrder(
+                    // unit tests
+                    "detektYoungHarryDebugUnitTest",
+                    "detektOldHarryDebugUnitTest",
+                    "detektYoungSallyDebugUnitTest",
+                    "detektOldSallyDebugUnitTest",
+                    // instrumentation tests
+                    "detektYoungHarryDebugAndroidTest",
+                    "detektOldHarryDebugAndroidTest",
+                    "detektYoungSallyDebugAndroidTest",
+                    "detektOldSallyDebugAndroidTest"
+                )
+        }
+
+        it("creates experimental tasks for different build variants excluding ignored flavors") {
+            val project = ProjectBuilder.builder().build()
+
+            with(project.pluginManager) {
+                apply(DetektAndroidPlugin::class.java)
+                apply("com.android.library")
+                apply("kotlin-android")
+            }
+
+            project.configureExtension<LibraryExtension> {
+                compileSdkVersion(COMPILE_SDK_VERSION)
+                flavorTestSetup()
+            }
+
+            project.configureExtension<DetektAndroidExtension> {
+                ignoredFlavors = listOf("oldHarry", "youngSally")
+            }
+
+            project.evaluate()
+
+            Assertions.assertThat(project.getTask("detektMain").dependencies())
+                .containsExactlyInAnyOrder(
+                    "detektYoungHarryDebug",
+                    "detektYoungHarryRelease",
+                    "detektOldSallyDebug",
+                    "detektOldSallyRelease"
+                )
+
+            Assertions.assertThat(project.getTask("detektTest").dependencies())
+                .containsExactlyInAnyOrder(
+                    // unit tests
+                    "detektYoungHarryDebugUnitTest",
+                    "detektYoungHarryReleaseUnitTest",
+                    "detektOldSallyDebugUnitTest",
+                    "detektOldSallyReleaseUnitTest",
+                    // instrumentation tests
+                    "detektYoungHarryDebugAndroidTest",
+                    "detektOldSallyDebugAndroidTest"
+                )
+        }
     }
 })
+
+internal const val COMPILE_SDK_VERSION = 29
 
 internal fun Task.dependencies() = taskDependencies.getDependencies(this).map { it.name }
 
@@ -168,9 +293,24 @@ internal fun Project.getTask(name: String) = project.tasks.getAt(name)
 
 internal fun Project.evaluate() = (this as ProjectInternal).evaluate()
 
-internal inline fun <reified T : BaseExtension> Project.configureAndroidPlugin(configuration: T.() -> Unit = {}) {
-    project.extensions.findByType(T::class.java)?.apply {
-        compileSdkVersion(29)
-        configuration(this)
-    }
+internal fun BaseExtension.flavorTestSetup() {
+    flavorDimensions("age", "name")
+    productFlavors(Action {
+        it.create("harry").apply {
+            dimension = "name"
+        }
+        it.create("sally").apply {
+            dimension = "name"
+        }
+        it.create("young").apply {
+            dimension = "age"
+        }
+        it.create("old").apply {
+            dimension = "age"
+        }
+    })
+}
+
+internal inline fun <reified T : Any> Project.configureExtension(configuration: T.() -> Unit = {}) {
+    project.extensions.findByType(T::class.java)?.apply(configuration)
 }
