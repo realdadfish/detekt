@@ -104,7 +104,7 @@ class DetektPlugin : Plugin<Project> {
     private fun Project.registerJvmCreateBaselineTask(extension: DetektExtension, sourceSet: SourceSet) {
         val kotlinSourceSet = (sourceSet as HasConvention).convention.plugins["kotlin"] as? KotlinSourceSet
             ?: throw GradleException("Kotlin source set not found. Please report on detekt's issue tracker")
-        registerCreateBaselineTask(BASELINE + sourceSet.name.capitalize(), extension) {
+        registerCreateBaselineTask(BASELINE_TASK_NAME + sourceSet.name.capitalize(), extension) {
             setSource(kotlinSourceSet.kotlin.files)
             classpath.setFrom(sourceSet.compileClasspath, sourceSet.output.classesDirs.filter { it.exists() })
             val variantBaselineFile = extension.baseline?.addVariantName(sourceSet.name)
@@ -114,7 +114,7 @@ class DetektPlugin : Plugin<Project> {
     }
 
     private fun Project.registerOldCreateBaselineTask(extension: DetektExtension) =
-        registerCreateBaselineTask(BASELINE, extension) {
+        registerCreateBaselineTask(BASELINE_TASK_NAME, extension) {
             setSource(existingInputDirectoriesProvider(project, extension))
             baseline.set(project.layout.file(project.provider { extension.baseline }))
         }
@@ -165,10 +165,10 @@ class DetektPlugin : Plugin<Project> {
 
     companion object {
         const val DETEKT_TASK_NAME = "detekt"
+        const val BASELINE_TASK_NAME = "detektBaseline"
         const val DETEKT_EXTENSION = "detekt"
         const val DETEKT_ANDROID_EXTENSION = "detektAndroid"
         private const val GENERATE_CONFIG = "detektGenerateConfig"
-        private const val BASELINE = "detektBaseline"
         internal val defaultExcludes = listOf("build/")
         internal val defaultIncludes = listOf("**/*.kt", "**/*.kts")
         internal const val CONFIG_DIR_NAME = "config/detekt"

@@ -9,6 +9,9 @@ import com.android.build.gradle.internal.api.TestedVariant
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import io.gitlab.arturbosch.detekt.extensions.DetektAndroidExtension
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
+import io.gitlab.arturbosch.detekt.internal.addVariantName
+import io.gitlab.arturbosch.detekt.internal.existingVariantOrBaseFile
+import io.gitlab.arturbosch.detekt.internal.registerCreateBaselineTask
 import io.gitlab.arturbosch.detekt.internal.registerDetektTask
 import org.gradle.api.DomainObjectSet
 import org.gradle.api.Plugin
@@ -24,7 +27,7 @@ class DetektAndroidPlugin : Plugin<Project> {
     private val mainTaskProvider: TaskProvider<Task> by lazy {
         project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Main") {
             it.group = "verification"
-            it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for production classes across " +
+            it.description = "EXPERIMENTAL: Run detekt analysis for production classes across " +
                     "all variants with type resolution"
         }
     }
@@ -32,7 +35,23 @@ class DetektAndroidPlugin : Plugin<Project> {
     private val testTaskProvider: TaskProvider<Task> by lazy {
         project.tasks.register("${DetektPlugin.DETEKT_TASK_NAME}Test") {
             it.group = "verification"
-            it.description = "EXPERIMENTAL & SLOW: Run detekt analysis for test classes across " +
+            it.description = "EXPERIMENTAL: Run detekt analysis for test classes across " +
+                    "all variants with type resolution"
+        }
+    }
+
+    private val mainBaselineTaskProvider: TaskProvider<Task> by lazy {
+        project.tasks.register("${DetektPlugin.BASELINE_TASK_NAME}Main") {
+            it.group = "verification"
+            it.description = "EXPERIMENTAL: Creates detekt baseline files for production classes across " +
+                    "all variants with type resolution"
+        }
+    }
+
+    private val testBaselineTaskProvider: TaskProvider<Task> by lazy {
+        project.tasks.register("${DetektPlugin.BASELINE_TASK_NAME}Test") {
+            it.group = "verification"
+            it.description = "EXPERIMENTAL: Creates detekt baseline files for test classes across " +
                     "all variants with type resolution"
         }
     }
@@ -63,12 +82,20 @@ class DetektAndroidPlugin : Plugin<Project> {
                             project.registerAndroidDetektTask(bootClasspath, extension, variant).also { provider ->
                                 mainTaskProvider.dependsOn(provider)
                             }
+                            project.registerAndroidCreateBaselineTask(bootClasspath, extension, variant)
+                                .also { provider ->
+                                    mainBaselineTaskProvider.dependsOn(provider)
+                                }
                             variant.testVariants
                                 .filter { !extension.matchesIgnoredConfiguration(it) }
                                 .forEach { testVariant ->
                                     project.registerAndroidDetektTask(bootClasspath, extension, testVariant)
                                         .also { provider ->
                                             testTaskProvider.dependsOn(provider)
+                                        }
+                                    project.registerAndroidCreateBaselineTask(bootClasspath, extension, testVariant)
+                                        .also { provider ->
+                                            testBaselineTaskProvider.dependsOn(provider)
                                         }
                                 }
                         }
@@ -102,9 +129,27 @@ class DetektAndroidPlugin : Plugin<Project> {
         registerDetektTask(DetektPlugin.DETEKT_TASK_NAME + variant.name.capitalize(), extension) {
             setSource(variant.sourceSets.map { it.javaDirectories })
             classpath.setFrom(variant.getCompileClasspath(null).filter { it.exists() } + bootClasspath)
+            // If a baseline file is configured as input file, it must exist to be configured, otherwise the task fails.
+            // We try to find the configured baseline or alternatively a specific variant matching this task.
+            extension.baseline?.existingVariantOrBaseFile(variant.name)?.let { baselineFile ->
+                baseline.set(layout.file(project.provider { baselineFile }))
+            }
             reports.xml.destination = File(extension.reportsDir, variant.name + ".xml")
             reports.html.destination = File(extension.reportsDir, variant.name + ".html")
             reports.txt.destination = File(extension.reportsDir, variant.name + ".txt")
-            description = "EXPERIMENTAL & SLOW: Run detekt analysis for ${variant.name} classes with type resolution"
+            description = "EXPERIMENTAL: Run detekt analysis for ${variant.name} classes with type resolution"
+        }
+
+    private fun Project.registerAndroidCreateBaselineTask(
+        bootClasspath: FileCollection,
+        extension: DetektExtension,
+        variant: BaseVariant
+    ): TaskProvider<DetektCreateBaselineTask> =
+        registerCreateBaselineTask(DetektPlugin.BASELINE_TASK_NAME + variant.name.capitalize(), extension) {
+            setSource(variant.sourceSets.map { it.javaDirectories })
+            classpath.setFrom(variant.getCompileClasspath(null).filter { it.exists() } + bootClasspath)
+            val variantBaselineFile = extension.baseline?.addVariantName(variant.name)
+            baseline.set(project.layout.file(project.provider { variantBaselineFile }))
+            description = "EXPERIMENTAL: Creates detekt baseline for ${variant.name} classes with type resolution"
         }
 }
